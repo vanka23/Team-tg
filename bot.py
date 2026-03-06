@@ -3,6 +3,7 @@ import asyncio
 import aiosqlite
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.filters import Command
 from datetime import datetime
 
 TOKEN = "8750643424:AAEobsm2dbY0ioFcMcnzWIviFTEG3n3odxI"
@@ -21,17 +22,6 @@ user_kb = ReplyKeyboardMarkup(
         [KeyboardButton(text="💰 Заработок"), KeyboardButton(text="🦣 Мамонты")],
         [KeyboardButton(text="📅 Дней в тиме"), KeyboardButton(text="🏆 Топ")],
         [KeyboardButton(text="📞 Вызвать админа")]
-    ],
-    resize_keyboard=True
-)
-
-admin_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="➕ Добавить деньги")],
-        [KeyboardButton(text="➖ Снять деньги")],
-        [KeyboardButton(text="➕ Добавить мамонта")],
-        [KeyboardButton(text="👥 Воркеры")],
-        [KeyboardButton(text="📊 Статистика")]
     ],
     resize_keyboard=True
 )
@@ -67,10 +57,10 @@ async def init_db():
         await db.commit()
 
 # =================
-# РЕГИСТРАЦИЯ
+# СТАРТ
 # =================
 
-@dp.message(commands=["start"])
+@dp.message(Command("start"))
 async def start(message: types.Message):
 
     async with aiosqlite.connect("team.db") as db:
@@ -120,7 +110,9 @@ async def get_role(user_id):
 
         data = await cursor.fetchone()
 
-        return data[0]
+        if data:
+            return data[0]
+        return None
 
 # =================
 # ПРОФИЛЬ
@@ -137,6 +129,10 @@ async def profile(message: types.Message):
         )
 
         data = await cursor.fetchone()
+
+    if not data:
+        await message.answer("Пользователь не найден")
+        return
 
     join = datetime.fromisoformat(data[2])
     days = (datetime.now() - join).days
@@ -167,7 +163,8 @@ async def top(message: types.Message):
     text = "🏆 ТОП воркеров\n\n"
 
     for i, user in enumerate(top, 1):
-        text += f"{i}. @{user[0]} — ${user[1]}\n"
+        name = user[0] if user[0] else "Без ника"
+        text += f"{i}. {name} — ${user[1]}\n"
 
     await message.answer(text)
 
@@ -175,7 +172,7 @@ async def top(message: types.Message):
 # ДОБАВИТЬ ДЕНЬГИ
 # =================
 
-@dp.message(commands=["addmoney"])
+@dp.message(Command("addmoney"))
 async def add_money(message: types.Message):
 
     role = await get_role(message.from_user.id)
@@ -184,6 +181,10 @@ async def add_money(message: types.Message):
         return
 
     args = message.text.split()
+
+    if len(args) < 3:
+        await message.answer("Использование: /addmoney user_id сумма")
+        return
 
     uid = int(args[1])
     amount = int(args[2])
@@ -205,10 +206,10 @@ async def add_money(message: types.Message):
     await message.answer("💰 Деньги добавлены")
 
 # =================
-# МАМОНТ
+# ДОБАВИТЬ МАМОНТА
 # =================
 
-@dp.message(commands=["addmammoth"])
+@dp.message(Command("addmammoth"))
 async def add_mammoth(message: types.Message):
 
     role = await get_role(message.from_user.id)
@@ -217,6 +218,10 @@ async def add_mammoth(message: types.Message):
         return
 
     args = message.text.split()
+
+    if len(args) < 2:
+        await message.answer("Использование: /addmammoth user_id")
+        return
 
     uid = int(args[1])
 
@@ -257,12 +262,15 @@ async def stats(message: types.Message):
 
         users = await cursor.fetchone()
 
+    money = data[0] or 0
+    mammoths = data[1] or 0
+
     await message.answer(f"""
 📊 Статистика команды
 
 👥 Воркеров: {users[0]}
-💰 Общий заработок: ${data[0]}
-🦣 Мамонтов: {data[1]}
+💰 Общий заработок: ${money}
+🦣 Мамонтов: {mammoths}
 """)
 
 # =================
@@ -278,4 +286,5 @@ async def main():
     await dp.start_polling(bot)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
