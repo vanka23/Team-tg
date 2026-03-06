@@ -42,6 +42,7 @@ admin_kb = ReplyKeyboardMarkup(
 
 async def init_db():
     async with aiosqlite.connect("team.db") as db:
+
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users(
         user_id INTEGER PRIMARY KEY,
@@ -119,9 +120,7 @@ async def get_role(user_id):
 
         data = await cursor.fetchone()
 
-        if data:
-            return data[0]
-        return None
+        return data[0]
 
 # =================
 # ПРОФИЛЬ
@@ -138,10 +137,6 @@ async def profile(message: types.Message):
         )
 
         data = await cursor.fetchone()
-
-    if not data:
-        await message.answer("Пользователь не найден.")
-        return
 
     join = datetime.fromisoformat(data[2])
     days = (datetime.now() - join).days
@@ -172,8 +167,7 @@ async def top(message: types.Message):
     text = "🏆 ТОП воркеров\n\n"
 
     for i, user in enumerate(top, 1):
-        name = user[0] if user[0] else "Без ника"
-        text += f"{i}. {name} — ${user[1]}\n"
+        text += f"{i}. @{user[0]} — ${user[1]}\n"
 
     await message.answer(text)
 
@@ -190,10 +184,6 @@ async def add_money(message: types.Message):
         return
 
     args = message.text.split()
-
-    if len(args) < 3:
-        await message.answer("Использование: /addmoney user_id сумма")
-        return
 
     uid = int(args[1])
     amount = int(args[2])
@@ -227,10 +217,6 @@ async def add_mammoth(message: types.Message):
         return
 
     args = message.text.split()
-
-    if len(args) < 2:
-        await message.answer("Использование: /addmammoth user_id")
-        return
 
     uid = int(args[1])
 
@@ -271,15 +257,12 @@ async def stats(message: types.Message):
 
         users = await cursor.fetchone()
 
-    money = data[0] or 0
-    mammoths = data[1] or 0
-
     await message.answer(f"""
 📊 Статистика команды
 
 👥 Воркеров: {users[0]}
-💰 Общий заработок: ${money}
-🦣 Мамонтов: {mammoths}
+💰 Общий заработок: ${data[0]}
+🦣 Мамонтов: {data[1]}
 """)
 
 # =================
@@ -295,5 +278,4 @@ async def main():
     await dp.start_polling(bot)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())
