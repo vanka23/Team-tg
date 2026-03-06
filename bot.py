@@ -1,3 +1,4 @@
+
 import asyncio
 import aiosqlite
 from aiogram import Bot, Dispatcher, types
@@ -15,24 +16,24 @@ dp = Dispatcher()
 # =================
 
 user_kb = ReplyKeyboardMarkup(
-keyboard=[
-[KeyboardButton(text="👤 Профиль")],
-[KeyboardButton(text="💰 Заработок"),KeyboardButton(text="🦣 Мамонты")],
-[KeyboardButton(text="📅 Дней в тиме"),KeyboardButton(text="🏆 Топ")],
-[KeyboardButton(text="📞 Вызвать админа")]
-],
-resize_keyboard=True
+    keyboard=[
+        [KeyboardButton(text="👤 Профиль")],
+        [KeyboardButton(text="💰 Заработок"), KeyboardButton(text="🦣 Мамонты")],
+        [KeyboardButton(text="📅 Дней в тиме"), KeyboardButton(text="🏆 Топ")],
+        [KeyboardButton(text="📞 Вызвать админа")]
+    ],
+    resize_keyboard=True
 )
 
 admin_kb = ReplyKeyboardMarkup(
-keyboard=[
-[KeyboardButton(text="➕ Добавить деньги")],
-[KeyboardButton(text="➖ Снять деньги")],
-[KeyboardButton(text="➕ Добавить мамонта")],
-[KeyboardButton(text="👥 Воркеры")],
-[KeyboardButton(text="📊 Статистика")]
-],
-resize_keyboard=True
+    keyboard=[
+        [KeyboardButton(text="➕ Добавить деньги")],
+        [KeyboardButton(text="➖ Снять деньги")],
+        [KeyboardButton(text="➕ Добавить мамонта")],
+        [KeyboardButton(text="👥 Воркеры")],
+        [KeyboardButton(text="📊 Статистика")]
+    ],
+    resize_keyboard=True
 )
 
 # =================
@@ -40,31 +41,29 @@ resize_keyboard=True
 # =================
 
 async def init_db():
+    async with aiosqlite.connect("team.db") as db:
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        role TEXT,
+        join_date TEXT,
+        money INTEGER,
+        mammoths INTEGER
+        )
+        """)
 
-async with aiosqlite.connect("team.db") as db:
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS logs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        action TEXT,
+        amount INTEGER,
+        date TEXT
+        )
+        """)
 
-await db.execute("""
-CREATE TABLE IF NOT EXISTS users(
-user_id INTEGER PRIMARY KEY,
-username TEXT,
-role TEXT,
-join_date TEXT,
-money INTEGER,
-mammoths INTEGER
-)
-""")
-
-await db.execute("""
-CREATE TABLE IF NOT EXISTS logs(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-user_id INTEGER,
-action TEXT,
-amount INTEGER,
-date TEXT
-)
-""")
-
-await db.commit()
+        await db.commit()
 
 # =================
 # РЕГИСТРАЦИЯ
@@ -73,37 +72,37 @@ await db.commit()
 @dp.message(commands=["start"])
 async def start(message: types.Message):
 
-async with aiosqlite.connect("team.db") as db:
+    async with aiosqlite.connect("team.db") as db:
 
-cursor=await db.execute(
-"SELECT * FROM users WHERE user_id=?",
-(message.from_user.id,)
-)
+        cursor = await db.execute(
+            "SELECT * FROM users WHERE user_id=?",
+            (message.from_user.id,)
+        )
 
-user=await cursor.fetchone()
+        user = await cursor.fetchone()
 
-if not user:
+        if not user:
 
-role="worker"
+            role = "worker"
 
-if message.from_user.id==OWNER_ID:
-role="owner"
+            if message.from_user.id == OWNER_ID:
+                role = "owner"
 
-await db.execute(
-"INSERT INTO users VALUES(?,?,?,?,?,?)",
-(
-message.from_user.id,
-message.from_user.username,
-role,
-datetime.now().isoformat(),
-0,
-0
-)
-)
+            await db.execute(
+                "INSERT INTO users VALUES(?,?,?,?,?,?)",
+                (
+                    message.from_user.id,
+                    message.from_user.username,
+                    role,
+                    datetime.now().isoformat(),
+                    0,
+                    0
+                )
+            )
 
-await db.commit()
+            await db.commit()
 
-await message.answer("🔥 Добро пожаловать",reply_markup=user_kb)
+    await message.answer("🔥 Добро пожаловать", reply_markup=user_kb)
 
 # =================
 # РОЛЬ
@@ -111,38 +110,43 @@ await message.answer("🔥 Добро пожаловать",reply_markup=user_kb
 
 async def get_role(user_id):
 
-async with aiosqlite.connect("team.db") as db:
+    async with aiosqlite.connect("team.db") as db:
 
-cursor=await db.execute(
-"SELECT role FROM users WHERE user_id=?",
-(user_id,)
-)
+        cursor = await db.execute(
+            "SELECT role FROM users WHERE user_id=?",
+            (user_id,)
+        )
 
-data=await cursor.fetchone()
+        data = await cursor.fetchone()
 
-return data[0]
+        if data:
+            return data[0]
+        return None
 
 # =================
 # ПРОФИЛЬ
 # =================
 
-@dp.message(lambda m: m.text=="👤 Профиль")
+@dp.message(lambda m: m.text == "👤 Профиль")
 async def profile(message: types.Message):
 
-async with aiosqlite.connect("team.db") as db:
+    async with aiosqlite.connect("team.db") as db:
 
-cursor=await db.execute(
-"SELECT money,mammoths,join_date FROM users WHERE user_id=?",
-(message.from_user.id,)
-)
+        cursor = await db.execute(
+            "SELECT money,mammoths,join_date FROM users WHERE user_id=?",
+            (message.from_user.id,)
+        )
 
-data=await cursor.fetchone()
+        data = await cursor.fetchone()
 
-join=datetime.fromisoformat(data[2])
+    if not data:
+        await message.answer("Пользователь не найден.")
+        return
 
-days=(datetime.now()-join).days
+    join = datetime.fromisoformat(data[2])
+    days = (datetime.now() - join).days
 
-await message.answer(f"""
+    await message.answer(f"""
 👤 Профиль
 
 💰 Деньги: ${data[0]}
@@ -154,24 +158,24 @@ await message.answer(f"""
 # ТОП
 # =================
 
-@dp.message(lambda m: m.text=="🏆 Топ")
+@dp.message(lambda m: m.text == "🏆 Топ")
 async def top(message: types.Message):
 
-async with aiosqlite.connect("team.db") as db:
+    async with aiosqlite.connect("team.db") as db:
 
-cursor=await db.execute(
-"SELECT username,money FROM users ORDER BY money DESC LIMIT 10"
-)
+        cursor = await db.execute(
+            "SELECT username,money FROM users ORDER BY money DESC LIMIT 10"
+        )
 
-top=await cursor.fetchall()
+        top = await cursor.fetchall()
 
-text="🏆 ТОП воркеров\n\n"
+    text = "🏆 ТОП воркеров\n\n"
 
-for i,user in enumerate(top,1):
+    for i, user in enumerate(top, 1):
+        name = user[0] if user[0] else "Без ника"
+        text += f"{i}. {name} — ${user[1]}\n"
 
-text+=f"{i}. @{user[0]} — ${user[1]}\n"
-
-await message.answer(text)
+    await message.answer(text)
 
 # =================
 # ДОБАВИТЬ ДЕНЬГИ
@@ -180,31 +184,35 @@ await message.answer(text)
 @dp.message(commands=["addmoney"])
 async def add_money(message: types.Message):
 
-role=await get_role(message.from_user.id)
+    role = await get_role(message.from_user.id)
 
-if role not in ["admin","owner"]:
-return
+    if role not in ["admin", "owner"]:
+        return
 
-args=message.text.split()
+    args = message.text.split()
 
-uid=int(args[1])
-amount=int(args[2])
+    if len(args) < 3:
+        await message.answer("Использование: /addmoney user_id сумма")
+        return
 
-async with aiosqlite.connect("team.db") as db:
+    uid = int(args[1])
+    amount = int(args[2])
 
-await db.execute(
-"UPDATE users SET money=money+? WHERE user_id=?",
-(amount,uid)
-)
+    async with aiosqlite.connect("team.db") as db:
 
-await db.execute(
-"INSERT INTO logs(user_id,action,amount,date) VALUES(?,?,?,?)",
-(uid,"add_money",amount,datetime.now().isoformat())
-)
+        await db.execute(
+            "UPDATE users SET money=money+? WHERE user_id=?",
+            (amount, uid)
+        )
 
-await db.commit()
+        await db.execute(
+            "INSERT INTO logs(user_id,action,amount,date) VALUES(?,?,?,?)",
+            (uid, "add_money", amount, datetime.now().isoformat())
+        )
 
-await message.answer("💰 Деньги добавлены")
+        await db.commit()
+
+    await message.answer("💰 Деньги добавлены")
 
 # =================
 # МАМОНТ
@@ -213,58 +221,65 @@ await message.answer("💰 Деньги добавлены")
 @dp.message(commands=["addmammoth"])
 async def add_mammoth(message: types.Message):
 
-role=await get_role(message.from_user.id)
+    role = await get_role(message.from_user.id)
 
-if role not in ["admin","owner"]:
-return
+    if role not in ["admin", "owner"]:
+        return
 
-args=message.text.split()
+    args = message.text.split()
 
-uid=int(args[1])
+    if len(args) < 2:
+        await message.answer("Использование: /addmammoth user_id")
+        return
 
-async with aiosqlite.connect("team.db") as db:
+    uid = int(args[1])
 
-await db.execute(
-"UPDATE users SET mammoths=mammoths+1 WHERE user_id=?",
-(uid,)
-)
+    async with aiosqlite.connect("team.db") as db:
 
-await db.commit()
+        await db.execute(
+            "UPDATE users SET mammoths=mammoths+1 WHERE user_id=?",
+            (uid,)
+        )
 
-await message.answer("🦣 Мамонт добавлен")
+        await db.commit()
+
+    await message.answer("🦣 Мамонт добавлен")
 
 # =================
 # СТАТИСТИКА
 # =================
 
-@dp.message(lambda m: m.text=="📊 Статистика")
+@dp.message(lambda m: m.text == "📊 Статистика")
 async def stats(message: types.Message):
 
-role=await get_role(message.from_user.id)
+    role = await get_role(message.from_user.id)
 
-if role not in ["admin","owner"]:
-return
+    if role not in ["admin", "owner"]:
+        return
 
-async with aiosqlite.connect("team.db") as db:
+    async with aiosqlite.connect("team.db") as db:
 
-cursor=await db.execute(
-"SELECT SUM(money),SUM(mammoths) FROM users"
-)
+        cursor = await db.execute(
+            "SELECT SUM(money),SUM(mammoths) FROM users"
+        )
 
-data=await cursor.fetchone()
+        data = await cursor.fetchone()
 
-cursor=await db.execute(
-"SELECT COUNT(*) FROM users"
-)
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM users"
+        )
 
-users=await cursor.fetchone()
+        users = await cursor.fetchone()
 
-await message.answer(f"""
+    money = data[0] or 0
+    mammoths = data[1] or 0
+
+    await message.answer(f"""
 📊 Статистика команды
 
 👥 Воркеров: {users[0]}
-💰 Общий заработок: ${data[0]}
-🦣 Мамонтов: {data[1]}
+💰 Общий заработок: ${money}
+🦣 Мамонтов: {mammoths}
 """)
 
 # =================
@@ -273,10 +288,12 @@ await message.answer(f"""
 
 async def main():
 
-await init_db()
+    await init_db()
 
-print("BOT STARTED")
+    print("BOT STARTED")
 
-await dp.start_polling(bot)
+    await dp.start_polling(bot)
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())
